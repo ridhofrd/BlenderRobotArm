@@ -1,6 +1,9 @@
 import bpy
 import math
 import mathutils
+import random
+import time
+
 def duplicate_object(original_name, new_name, collection_name=None):
     original_object = bpy.data.objects.get(original_name)
     if original_object is None:
@@ -48,10 +51,332 @@ def parent_objects(parent_obj, child_obj):
     Set one object as the parent of another.
     """
     child_obj.parent = parent_obj
+
+
+################################################################
+# helper functions BEGIN
+################################################################
+
+
+def purge_orphans():
+    """
+    Remove all orphan data blocks
+
+    see this from more info:
+    https://youtu.be/3rNqVPtbhzc?t=149
+    """
+    if bpy.app.version >= (3, 0, 0):
+        # run this only for Blender versions 3.0 and higher
+        bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
+    else:
+        # run this only for Blender versions lower than 3.0
+        # call purge_orphans() recursively until there are no more orphan data blocks to purge
+        result = bpy.ops.outliner.orphans_purge()
+        if result.pop() != "CANCELLED":
+            purge_orphans()
+
+
+def clean_scene():
+    """
+    Removing all of the objects, collection, materials, particles,
+    textures, images, curves, meshes, actions, nodes, and worlds from the scene
+
+    Checkout this video explanation with example
+
+    "How to clean the scene with Python in Blender (with examples)"
+    https://youtu.be/3rNqVPtbhzc
+    """
+    # make sure the active object is not in Edit Mode
+    if bpy.context.active_object and bpy.context.active_object.mode == "EDIT":
+        bpy.ops.object.editmode_toggle()
+
+    # make sure non of the objects are hidden from the viewport, selection, or disabled
+    for obj in bpy.data.objects:
+        obj.hide_set(False)
+        obj.hide_select = False
+        obj.hide_viewport = False
+
+    # select all the object and delete them (just like pressing A + X + D in the viewport)
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete()
+
+    # find all the collections and remove them
+    collection_names = [col.name for col in bpy.data.collections]
+    for name in collection_names:
+        bpy.data.collections.remove(bpy.data.collections[name])
+
+    # in the case when you modify the world shader
+    # delete and recreate the world object
+    world_names = [world.name for world in bpy.data.worlds]
+    for name in world_names:
+        bpy.data.worlds.remove(bpy.data.worlds[name])
+    # create a new world data block
+    bpy.ops.world.new()
+    bpy.context.scene.world = bpy.data.worlds["World"]
+
+    purge_orphans()
+
+
+def active_object():
+    """
+    returns the active object
+    """
+    return bpy.context.active_object
+
+
+def time_seed():
+    """
+    Sets the random seed based on the time
+    and copies the seed into the clipboard
+    """
+    seed = time.time()
+    print(f"seed: {seed}")
+    random.seed(seed)
+
+    # add the seed value to your clipboard
+    bpy.context.window_manager.clipboard = str(seed)
+
+    return seed
+
+
+def add_ctrl_empty(name=None):
+    bpy.ops.object.empty_add(type="PLAIN_AXES", align="WORLD")
+    empty_ctrl = active_object()
+
+    if name:
+        empty_ctrl.name = name
+    else:
+        empty_ctrl.name = "empty.cntrl"
+
+    return empty_ctrl
+
+
+def make_active(obj):
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+
+
+def track_empty(obj):
+    """
+    create an empty and add a 'Track To' constraint
+    """
+    empty = add_ctrl_empty(name=f"empty.tracker-target.{obj.name}")
+
+    make_active(obj)
+    bpy.ops.object.constraint_add(type="TRACK_TO")
+    bpy.context.object.constraints["Track To"].target = empty
+
+    return empty
+
+
+def setup_camera(loc, rot, frame_count):
+    """
+    create and setup the camera
+    """
+    bpy.ops.object.camera_add(location=loc, rotation=rot)
+    camera = active_object()
+
+    # set the camera as the "active camera" in the scene
+    bpy.context.scene.camera = camera
+
+    # set the Focal Length of the camera
+    camera.data.lens = 70
+
+    camera.data.passepartout_alpha = 0.9
+
+    empty = track_empty(camera)
+
+    camera.data.dof.use_dof = True
+    camera.data.dof.focus_object = empty
+    camera.data.dof.aperture_fstop = 0.35
+
+    start_value = camera.data.lens
+    mid_value = camera.data.lens - 10
+    loop_param(camera.data, "lens", start_value, mid_value, frame_count)
+
+    return empty
+
+
+def set_1080px_square_render_res():
+    """
+    Set the resolution of the rendered image to 1080 by 1080
+    """
+    bpy.context.scene.render.resolution_x = 1080
+    bpy.context.scene.render.resolution_y = 1080
+
+
+def set_scene_props(fps, loop_seconds):
+    """
+    Set scene properties
+    """
+    frame_count = fps * loop_seconds
+
+    scene = bpy.context.scene
+    scene.frame_end = frame_count
+
+    # set the world background to black
+    world = bpy.data.worlds["World"]
+    if "Background" in world.node_tree.nodes:
+        world.node_tree.nodes["Background"].inputs[0].default_value = (0, 0, 0, 1)
+
+    scene.render.fps = fps
+
+    scene.frame_current = 1
+    scene.frame_start = 1
+
+    scene.eevee.use_bloom = True
+    scene.eevee.bloom_intensity = 0.005
+
+    # set Ambient Occlusion properties
+    scene.eevee.use_gtao = True
+    scene.eevee.gtao_distance = 4
+    scene.eevee.gtao_factor = 5
+
+    scene.eevee.taa_render_samples = 64
+
+    if bpy.app.version < (4, 0, 0):
+        scene.view_settings.look = "Very High Contrast"
+    else:
+        scene.view_settings.look = "AgX - Very High Contrast"
+
+    set_1080px_square_render_res()
+
+
+def setup_scene(i=0):
+    fps = 30
+    loop_seconds = 12
+    frame_count = fps * loop_seconds
+
+    project_name = "stack_spin"
+    bpy.context.scene.render.image_settings.file_format = "FFMPEG"
+    bpy.context.scene.render.ffmpeg.format = "MPEG4"
+    bpy.context.scene.render.filepath = f"/tmp/project_{project_name}/loop_{i}.mp4"
+
+    seed = 0
+    if seed:
+        random.seed(seed)
+    else:
+        time_seed()
+
+    # Utility Building Blocks
+    clean_scene()
+    set_scene_props(fps, loop_seconds)
+
+    loc = (0, 0, 7)
+    rot = (0, 0, 0)
+    setup_camera(loc, rot, frame_count)
+
+    context = {
+        "frame_count": frame_count,
+    }
+
+    return context
+
+
+def make_fcurves_linear():
+    for fc in bpy.context.active_object.animation_data.action.fcurves:
+        fc.extrapolation = "LINEAR"
+
+
+def get_random_color():
+    return random.choice(
+        [
+            [0.92578125, 1, 0.0, 1],
+            [0.203125, 0.19140625, 0.28125, 1],
+            [0.8359375, 0.92578125, 0.08984375, 1],
+            [0.16796875, 0.6796875, 0.3984375, 1],
+            [0.6875, 0.71875, 0.703125, 1],
+            [0.9609375, 0.9140625, 0.48046875, 1],
+            [0.79296875, 0.8046875, 0.56640625, 1],
+            [0.96484375, 0.8046875, 0.83984375, 1],
+            [0.91015625, 0.359375, 0.125, 1],
+            [0.984375, 0.4609375, 0.4140625, 1],
+            [0.0625, 0.09375, 0.125, 1],
+            [0.2578125, 0.9140625, 0.86328125, 1],
+            [0.97265625, 0.21875, 0.1328125, 1],
+            [0.87109375, 0.39453125, 0.53515625, 1],
+            [0.8359375, 0.92578125, 0.08984375, 1],
+            [0.37109375, 0.29296875, 0.54296875, 1],
+            [0.984375, 0.4609375, 0.4140625, 1],
+            [0.92578125, 0.16796875, 0.19921875, 1],
+            [0.9375, 0.9609375, 0.96484375, 1],
+            [0.3359375, 0.45703125, 0.4453125, 1],
+        ]
+    )
+
+
+def render_loop():
+    bpy.ops.render.render(animation=True)
+
+
+def apply_random_color_material(obj):
+    color = get_random_color()
+    mat = bpy.data.materials.new(name="Material")
+    mat.use_nodes = True
+    mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = color
+    mat.node_tree.nodes["Principled BSDF"].inputs["Specular"].default_value = 0
+
+    obj.data.materials.append(mat)
+
+
+def add_lights():
+    rotation = (math.radians(60), 0.0, math.radians(180))
+    bpy.ops.object.light_add(type="SUN", rotation=rotation)
+    bpy.context.object.data.energy = 100
+    bpy.context.object.data.diffuse_factor = 0.05
+    bpy.context.object.data.angle = math.radians(45)
+
+
+def loop_param(obj, param_name, start_value, mid_value, frame_count):
+    frame = 1
+
+    setattr(obj, param_name, start_value)
+    obj.keyframe_insert(param_name, frame=frame)
+
+    frame = frame_count / 2
+    setattr(obj, param_name, mid_value)
+    obj.keyframe_insert(param_name, frame=frame)
+
+    frame = frame_count
+    setattr(obj, param_name, start_value)
+    obj.keyframe_insert(param_name, frame=frame)
+
+
+def set_keyframe_to_ease_in_out(obj):
+    for fcurve in obj.animation_data.action.fcurves:
+        for kf in fcurve.keyframe_points:
+            kf.interpolation = "BACK"
+            kf.easing = "EASE_IN_OUT"
+
+
+################################################################
+# helper functions END
+################################################################
+
+def importArmRobot():
+    #ubah prefix_path ke path dari folder asset kalian
+    prefix_path = r"C:\Users\Muhammad Ridho F\Desktop\POLBAN\Computer Grafik\RobotArm\GITWorkspace\STEAMFY_ASSET"
+    ANGLE_path = r"\ANGLE.stl"
+    CUBE_path = r"\CUBE.stl"
+    GRIPPER_path = r"\GRIPPER.stl"
+    PLATE_path = r"\PLATE.stl"
+    ROTATIONAXIS_path = r"\ROTATIONAXIS.stl"
+    ROTOR_path = r"\ROTOR.stl"
+    SHAFT_path = r"\SHAFT.stl"
     
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.object.delete()
     
-# Example usage:
-if __name__ == "__main__":
+    bpy.ops.wm.stl_import(filepath=(prefix_path + ANGLE_path))
+    bpy.ops.wm.stl_import(filepath=(prefix_path + CUBE_path))
+    bpy.ops.wm.stl_import(filepath=(prefix_path + GRIPPER_path))
+    bpy.ops.wm.stl_import(filepath=(prefix_path + PLATE_path))
+    bpy.ops.wm.stl_import(filepath=(prefix_path + ROTATIONAXIS_path))
+    bpy.ops.wm.stl_import(filepath=(prefix_path + ROTOR_path))
+    bpy.ops.wm.stl_import(filepath=(prefix_path + SHAFT_path))
+
+
     
     # Duplicate the object and optionally specify a collection
     plate = duplicate_object("PLATE", "plate", "Collection")
@@ -61,7 +386,7 @@ if __name__ == "__main__":
         resize_object(plate, 0.029202, 0.029202, 0.029202)
     
     rotor = duplicate_object("ROTOR", "rotor", "Collection")
-    if plate:
+    if rotor:
         set_location(rotor, -0.067378, 1.27627, 1.14376)
         rotate_object(rotor, x_degrees=0, y_degrees=0, z_degrees=45)
         resize_object(rotor, -0.026674, -0.026674, -0.026674)
@@ -72,17 +397,17 @@ if __name__ == "__main__":
         rotate_object(rotationaxis, x_degrees=0, y_degrees=0, z_degrees=0)
         resize_object(rotationaxis, -0.079003, -0.094633, 0.028991)
         
-    cube2 = duplicate_object("CUBE.002", "cube2", "Collection")
-    if cube2:
-        set_location(cube2, 0.076949, 0.940057, 1.69695)
-        rotate_object(cube2, x_degrees=180, y_degrees=0, z_degrees=0)
-        resize_object(cube2, -0.020435, -0.044361, 0.043016)
+    cube = duplicate_object("CUBE", "cube", "Collection")
+    if cube:
+        set_location(cube, 0.076949, 0.940057, 1.69695)
+        rotate_object(cube, x_degrees=180, y_degrees=0, z_degrees=0)
+        resize_object(cube, -0.020435, -0.044361, 0.043016)
         
-    angle2 = duplicate_object("ANGLE.002", "angle2", "Collection")
-    if angle2:
-        set_location(angle2, -0.358202, 0.926703, 1.91278)
-        rotate_object(angle2, x_degrees=223.887, y_degrees=0, z_degrees=180)
-        resize_object(angle2, 0.022659, 0.022659, 0.022659)
+    angle = duplicate_object("ANGLE", "angle", "Collection")
+    if angle:
+        set_location(angle, -0.358202, 0.926703, 1.91278)
+        rotate_object(angle, x_degrees=223.887, y_degrees=0, z_degrees=180)
+        resize_object(angle, 0.022659, 0.022659, 0.022659)
         
     shaft = duplicate_object("SHAFT", "shaft", "Collection")
     if shaft:
@@ -90,41 +415,41 @@ if __name__ == "__main__":
         rotate_object(shaft, x_degrees=35.8352, y_degrees=40, z_degrees=313.85)
         resize_object(shaft, 0.02375, 0.02375, 0.02375)
         
-    angle = duplicate_object("ANGLE", "angle", "Collection")
-    if angle:
-        set_location(angle, -0.358202, -0.029123, 2.42568)
-        rotate_object(angle, x_degrees=40.158, y_degrees=0, z_degrees=180)
-        resize_object(angle, 0.022659, 0.022659, 0.022659)
+    angle1 = duplicate_object("angle", "angle1", "Collection")
+    if angle1:
+        set_location(angle1, -0.358202, -0.029123, 2.42568)
+        rotate_object(angle1, x_degrees=40.158, y_degrees=0, z_degrees=180)
+        resize_object(angle1, 0.022659, 0.022659, 0.022659)
         
-    cube = duplicate_object("CUBE", "cube", "Collection")
-    if cube:
-        set_location(cube, 0.076949, -0.450501, 2.66975)
-        rotate_object(cube, x_degrees=-137.333, y_degrees=0, z_degrees=0)
-        resize_object(cube, -0.020394, -0.043908, -0.020394)
+    cube1 = duplicate_object("cube", "cube1", "Collection")
+    if cube1:
+        set_location(cube1, 0.076949, -0.450501, 2.66975)
+        rotate_object(cube1, x_degrees=-137.333, y_degrees=0, z_degrees=0)
+        resize_object(cube1, -0.020394, -0.043908, -0.020394)
         
-    shaft001 = duplicate_object("SHAFT.001", "shaft001", "Collection")
+    shaft001 = duplicate_object("shaft", "shaft001", "Collection")
     if shaft001:
         set_location(shaft001, -0.092524, 0.164382, 3.42365)
         rotate_object(shaft001, x_degrees=-33.431, y_degrees=-33.431, z_degrees=323.4)
         resize_object(shaft001, 0.02375, 0.02375, 0.02375)
         
-    cube001 = duplicate_object("CUBE.001", "cube001", "Collection")
-    if cube001:
-        set_location(cube001, 0.076949, 0.550098, 3.63451)
-        rotate_object(cube001, x_degrees=-137.333, y_degrees=0, z_degrees=0)
-        resize_object(cube001, -0.020394, -0.043908, -0.020394)
+    cube2 = duplicate_object("cube1", "cube2", "Collection")
+    if cube2:
+        set_location(cube2, 0.076949, 0.550098, 3.63451)
+        rotate_object(cube2, x_degrees=-137.333, y_degrees=0, z_degrees=0)
+        resize_object(cube2, -0.020394, -0.043908, -0.020394)
         
-    angle001 = duplicate_object("ANGLE.001", "angle001", "Collection")
-    if angle001:
-        set_location(angle001, -0.358202, 1.05752, 3.47314)
-        rotate_object(angle001, x_degrees=40.1576, y_degrees=0, z_degrees=-180)
-        resize_object(angle001, 0.022659, 0.022659, 0.022659)
+    angle2 = duplicate_object("angle1", "angle2", "Collection")
+    if angle2:
+        set_location(angle2, -0.358202, 1.05752, 3.47314)
+        rotate_object(angle2, x_degrees=40.1576, y_degrees=0, z_degrees=-180)
+        resize_object(angle2, 0.022659, 0.022659, 0.022659)
         
-    rotor001 = duplicate_object("ROTOR.001", "rotor001", "Collection")
-    if rotor001:
-        set_location(rotor001, -0.072524, 1.56643, 3.17345)
-        rotate_object(rotor001, x_degrees=-145.664, y_degrees=-29.1768, z_degrees=35.5155)
-        resize_object(rotor001, -0.019042, -0.019042, -0.019042)
+    rotor1 = duplicate_object("rotor", "rotor1", "Collection")
+    if rotor1:
+        set_location(rotor1, -0.072524, 1.56643, 3.17345)
+        rotate_object(rotor1, x_degrees=-145.664, y_degrees=-29.1768, z_degrees=35.5155)
+        resize_object(rotor1, -0.019042, -0.019042, -0.019042)
         
     gripper = duplicate_object("GRIPPER", "gripper", "Collection")
     if gripper:
@@ -132,8 +457,65 @@ if __name__ == "__main__":
         rotate_object(gripper, x_degrees=214.081, y_degrees=0, z_degrees=0)
         resize_object(gripper, 0.021216, 0.021216, 0.021216)
         
-    gripper001 = duplicate_object("GRIPPER.001", "gripper001", "Collection")
-    if gripper001:
-        set_location(gripper001, 0.215339, 1.59303, 3.16052)
-        rotate_object(gripper001, x_degrees=-38.9312, y_degrees=0, z_degrees=180)
-        resize_object(gripper001, 0.021216, 0.021216, 0.021216)
+    gripper1 = duplicate_object("gripper", "gripper1", "Collection")
+    if gripper1:
+        set_location(gripper1, 0.215339, 1.59303, 3.16052)
+        rotate_object(gripper1, x_degrees=-38.9312, y_degrees=0, z_degrees=180)
+        resize_object(gripper1, 0.021216, 0.021216, 0.021216)
+        
+    thruster = duplicate_object("rotor1","thruster", "Collection")
+    if thruster:
+        set_location(thruster, 1.76499, -0.977508, -0.002476)
+        rotate_object(thruster, x_degrees=176.994, y_degrees=2.9716, z_degrees=44.6315)
+        resize_object(thruster, -0.023033, -0.023033, -0.023033)
+        
+    thruster1 = duplicate_object("thruster","thruster1", "Collection")
+    if thruster1:
+        set_location(thruster1, -1.88332, -0.968107, -0.00117)
+        rotate_object(thruster1, x_degrees=176.994, y_degrees=2.9716, z_degrees=44.6315)
+        resize_object(thruster1, -0.023033, -0.023033, -0.023417)
+        
+    thruster2 = duplicate_object("thruster1","thruster2", "Collection")
+    if thruster2:
+        set_location(thruster2, -1.86581, 2.66486, 0.006509)
+        rotate_object(thruster2, x_degrees=176.994, y_degrees=2.9716, z_degrees=44.6315)
+        resize_object(thruster2, -0.023033, -0.023033, -0.023417)
+        
+    thruster3 = duplicate_object("thruster1","thruster3", "Collection")
+    if thruster1:
+        set_location(thruster3, 1.76499, 2.6485 , -0.011162)
+        rotate_object(thruster3, x_degrees=179.135, y_degrees=0.856294, z_degrees=44.703)
+        resize_object(thruster3, -0.023033, -0.023033, -0.023033)
+        
+    print("After")
+    
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.data.objects['ANGLE'].select_set(True)
+    bpy.data.objects['CUBE'].select_set(True)
+    bpy.data.objects['GRIPPER'].select_set(True)
+    bpy.data.objects['PLATE'].select_set(True)
+    bpy.data.objects['ROTATIONAXIS'].select_set(True)
+    bpy.data.objects['ROTOR'].select_set(True)
+    bpy.data.objects['SHAFT'].select_set(True)
+    bpy.ops.object.delete()
+
+
+def gen_centerpiece(context):
+    importArmRobot()
+
+
+def main():
+    """
+    Python code to generate an animation loop
+    """
+    context = setup_scene()
+    gen_centerpiece(context)
+    add_lights()
+
+    
+    
+    
+# Example usage:
+if __name__ == "__main__":
+    main()
+    
