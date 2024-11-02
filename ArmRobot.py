@@ -4,53 +4,6 @@ import mathutils
 import random
 import time
 
-def duplicate_object(original_name, new_name, collection_name=None):
-    original_object = bpy.data.objects.get(original_name)
-    if original_object is None:
-        print("Object not found")
-        return None
-
-    new_object_data = original_object.data.copy()
-    new_object = bpy.data.objects.new(new_name, new_object_data)
-
-    # Manage collection
-    if collection_name:
-        # Check if the collection exists
-        collection = bpy.data.collections.get(collection_name)
-        if not collection:
-            # Create new collection if it does not exist
-            collection = bpy.data.collections.new(collection_name)
-            bpy.context.scene.collection.children.link(collection)
-        collection.objects.link(new_object)
-    else:
-
-        original_collection = original_object.users_collection[0]  # Assumes the object is in at least one collection
-        original_collection.objects.link(new_object)
-
-    return new_object
-
-def rotate_object(obj, x_degrees=0, y_degrees=0, z_degrees=0):
-    if obj:
-        obj.rotation_euler[0] += math.radians(x_degrees)
-        obj.rotation_euler[1] += math.radians(y_degrees)
-        obj.rotation_euler[2] += math.radians(z_degrees)
-        bpy.context.view_layer.update()
-
-def set_location(obj, x, y, z):
-    if obj:
-        obj.location = (x, y, z)
-        bpy.context.view_layer.update()
-
-def resize_object(obj, scale_x, scale_y, scale_z):
-    if obj:
-        obj.scale = (scale_x, scale_y, scale_z)
-        bpy.context.view_layer.update()
-        
-def parent_objects(parent_obj, child_obj):
-    """
-    Set one object as the parent of another.
-    """
-    child_obj.parent = parent_obj
 
 
 ################################################################
@@ -354,6 +307,7 @@ def set_keyframe_to_ease_in_out(obj):
 # helper functions END
 ################################################################
 
+
 def importArmRobot():
     #ubah prefix_path ke path dari folder asset kalian
     prefix_path = r"C:\Users\Muhammad Ridho F\Desktop\POLBAN\Computer Grafik\RobotArm\GITWorkspace\STEAMFY_ASSET"
@@ -376,7 +330,7 @@ def importArmRobot():
     bpy.ops.wm.stl_import(filepath=(prefix_path + ROTOR_path))
     bpy.ops.wm.stl_import(filepath=(prefix_path + SHAFT_path))
 
-
+    global plate, rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3
     
     # Duplicate the object and optionally specify a collection
     plate = duplicate_object("PLATE", "plate", "Collection")
@@ -498,10 +452,86 @@ def importArmRobot():
     bpy.data.objects['ROTOR'].select_set(True)
     bpy.data.objects['SHAFT'].select_set(True)
     bpy.ops.object.delete()
+    
+def duplicate_object(original_name, new_name, collection_name=None):
+    original_object = bpy.data.objects.get(original_name)
+    if original_object is None:
+        print("Object not found")
+        return None
 
+    new_object_data = original_object.data.copy()
+    new_object = bpy.data.objects.new(new_name, new_object_data)
+
+    # Manage collection
+    if collection_name:
+        # Check if the collection exists
+        collection = bpy.data.collections.get(collection_name)
+        if not collection:
+            # Create new collection if it does not exist
+            collection = bpy.data.collections.new(collection_name)
+            bpy.context.scene.collection.children.link(collection)
+        collection.objects.link(new_object)
+    else:
+
+        original_collection = original_object.users_collection[0]  # Assumes the object is in at least one collection
+        original_collection.objects.link(new_object)
+
+    return new_object
+
+def rotate_object(obj, x_degrees=0, y_degrees=0, z_degrees=0):
+    if obj:
+        obj.rotation_euler[0] += math.radians(x_degrees)
+        obj.rotation_euler[1] += math.radians(y_degrees)
+        obj.rotation_euler[2] += math.radians(z_degrees)
+        bpy.context.view_layer.update()
+
+def set_location(obj, x, y, z):
+    if obj:
+        obj.location = (x, y, z)
+        bpy.context.view_layer.update()
+        
+def translate_object(obj, tx, ty, tz):
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.data.objects[obj.name].select_set(True)
+    
+    bpy.ops.transform.translate(value=(tx, ty, tz), orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', mirror=False, use_proportional_edit=False, proportional_edit_falloff='SMOOTH', proportional_size=1, use_proportional_connected=False, use_proportional_projected=False, snap=False, snap_elements={'INCREMENT'}, use_snap_project=False, snap_target='CLOSEST', use_snap_self=True, use_snap_edit=True, use_snap_nonedit=True, use_snap_selectable=False)
+
+    bpy.context.view_layer.update()
+
+
+def resize_object(obj, scale_x, scale_y, scale_z):
+    if obj:
+        obj.scale = (scale_x, scale_y, scale_z)
+        bpy.context.view_layer.update()
+        
+def parent_objects(parent_obj, child_obj):
+    """
+    Set one object as the parent of another.
+    """
+    child_obj.parent = parent_obj
+    
+def parentRobotArms():
+    object_list = [rotor, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
+    for i in object_list:
+        parent_objects(plate, i)
+    
+    
+def transformasiRidho():
+    translateList = [plate, rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
+    for i in translateList:
+        translate_object(i, 5, 0, 0)
+    
+    rotationList = [rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1]
+    for i in rotationList:
+        rotate_object(i, 0, 0, 60)
+        
+    #parent_objects(plate, rotor)
+    
 
 def gen_centerpiece(context):
     importArmRobot()
+    transformasiRidho()
+    #parentRobotArms()
 
 
 def main():
