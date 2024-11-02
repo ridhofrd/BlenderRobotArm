@@ -498,6 +498,16 @@ def translate_object(obj, tx, ty, tz):
 
     bpy.context.view_layer.update()
 
+def rotateObjectOnSelect(objList, radValue, axis):
+    bpy.ops.object.select_all(action='DESELECT')
+    for i in objList:
+        bpy.data.objects[i.name].select_set(True)
+    
+    bpy.ops.transform.rotate(value=radValue, orient_axis=axis, orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, False, True), mirror=False, use_proportional_edit=False, proportional_edit_falloff='SMOOTH', proportional_size=1, use_proportional_connected=False, use_proportional_projected=False, snap=False, snap_elements={'INCREMENT'}, use_snap_project=False, snap_target='CLOSEST', use_snap_self=True, use_snap_edit=True, use_snap_nonedit=True, use_snap_selectable=False)
+
+
+
+    bpy.context.view_layer.update()
 
 def resize_object(obj, scale_x, scale_y, scale_z):
     if obj:
@@ -522,8 +532,7 @@ def transformasiRidho():
         translate_object(i, 5, 0, 0)
     
     rotationList = [rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1]
-    for i in rotationList:
-        rotate_object(i, 0, 0, 60)
+    rotateObjectOnSelect(rotationList, 11, 'Z')
         
     #parent_objects(plate, rotor)
     
