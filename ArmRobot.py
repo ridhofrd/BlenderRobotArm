@@ -453,6 +453,11 @@ def importArmRobot():
     bpy.data.objects['SHAFT'].select_set(True)
     bpy.ops.object.delete()
     
+    armRobot_object_list = [plate, rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
+    
+    return armRobot_object_list
+    
+    
 def duplicate_object(original_name, new_name, collection_name=None):
     original_object = bpy.data.objects.get(original_name)
     if original_object is None:
@@ -515,10 +520,8 @@ def resize_object(obj, scale_x, scale_y, scale_z):
         bpy.context.view_layer.update()
         
 def parent_objects(parent_obj, child_obj):
-    """
-    Set one object as the parent of another.
-    """
-    child_obj.parent = parent_obj
+    bpy.ops.object.parent_set(type='OBJECT', keep_transform=False)
+
     
 def parentRobotArms():
     object_list = [rotor, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
@@ -529,17 +532,67 @@ def parentRobotArms():
 def transformasiRidho():
     translateList = [plate, rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
     for i in translateList:
-        translate_object(i, 5, 0, 0)
+        translate_object(i, 15, 0, 0)
+    
+    rotationList = [rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1]
+    rotateObjectOnSelect(rotationList, 360, 'Z')
+    
+def transformasiRidho2():
+    translateList = [plate, rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
+    for i in translateList:
+        translate_object(i, 0, 10, 0)
     
     rotationList = [rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1]
     rotateObjectOnSelect(rotationList, 11, 'Z')
+    
+def transformasiRidho3():
+    translateList = [plate, rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
+    for i in translateList:
+        translate_object(i, -15, 0, 0)
+    
+    rotationList = [rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1]
+    rotateObjectOnSelect(rotationList, -360, 'Z')
+    
+def transformasiRidho4():
+    translateList = [plate, rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
+    for i in translateList:
+        translate_object(i, 0, -15, 0)
+    
+    rotationList = [rotor, rotor1, rotationaxis, cube, angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1]
+    rotateObjectOnSelect(rotationList, -11, 'Z')
         
     #parent_objects(plate, rotor)
     
-
+def insertKeyFrameForObjectTrans(objList, transformation, frameTime):
+    for i in objList:
+        i.keyframe_insert(transformation, frame=frameTime)
+    
+    
 def gen_centerpiece(context):
-    importArmRobot()
+    RobotArmObj = importArmRobot()
+    
+    insertKeyFrameForObjectTrans(RobotArmObj, "rotation_euler", 1)
+    insertKeyFrameForObjectTrans(RobotArmObj, "location", 1)
+    
     transformasiRidho()
+    
+    insertKeyFrameForObjectTrans(RobotArmObj, "rotation_euler", 100)
+    insertKeyFrameForObjectTrans(RobotArmObj, "location", 100)
+    
+    transformasiRidho2()
+    
+    insertKeyFrameForObjectTrans(RobotArmObj, "rotation_euler", 200)
+    insertKeyFrameForObjectTrans(RobotArmObj, "location", 200)
+    
+    transformasiRidho3()
+    insertKeyFrameForObjectTrans(RobotArmObj, "rotation_euler", 300)
+    insertKeyFrameForObjectTrans(RobotArmObj, "location", 300)
+    
+    transformasiRidho4()
+    
+    insertKeyFrameForObjectTrans(RobotArmObj, "rotation_euler", 400)
+    insertKeyFrameForObjectTrans(RobotArmObj, "location", 400)
+    
     #parentRobotArms()
 
 
