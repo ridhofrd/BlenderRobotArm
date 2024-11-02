@@ -310,7 +310,7 @@ def set_keyframe_to_ease_in_out(obj):
 
 def importArmRobot():
     #ubah prefix_path ke path dari folder asset kalian
-    prefix_path = r"C:\Users\Muhammad Ridho F\Desktop\POLBAN\Computer Grafik\RobotArm\GITWorkspace\STEAMFY_ASSET"
+    prefix_path = r"C:\Users\LENOVO\OneDrive - Politeknik Negeri Bandung\Documents\Akademik\semester 3\Komputer Grafik\Praktek\7. Tugas_6\task 3\animasi\BlenderRobotArm\STEAMFY_ASSET"
     ANGLE_path = r"\ANGLE.stl"
     CUBE_path = r"\CUBE.stl"
     GRIPPER_path = r"\GRIPPER.stl"
@@ -513,6 +513,44 @@ def rotateObjectOnSelect(objList, radValue, axis):
 
 
     bpy.context.view_layer.update()
+    
+def rotate_object_on_x_axis(obj_name, rotation_value):
+    # Setel nama objek yang akan dirotasi
+    obj = bpy.data.objects.get(obj_name)
+    if obj is None:
+        print(f"Objek {obj_name} tidak ditemukan.")
+        return
+
+    # Deselect semua objek & pilih objek yang diinginkan
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+
+    # Lakukan rotasi
+    bpy.ops.transform.rotate(
+        value=rotation_value,  # nilai rotasi dalam radian
+        orient_axis='X',  # rotasi pada sumbu X
+        orient_type='GLOBAL',  # orientasi global
+        orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)),  # matriks orientasi global
+        orient_matrix_type='GLOBAL',
+        constraint_axis=(True, False, False),  # hanya sumbu X yang dirotasi
+        mirror=False,
+        use_proportional_edit=False,
+        proportional_edit_falloff='SMOOTH',
+        proportional_size=1,
+        use_proportional_connected=False,
+        use_proportional_projected=False,
+        snap=False,
+        snap_elements={'INCREMENT'},
+        use_snap_project=False,
+        snap_target='CLOSEST',
+        use_snap_self=True,
+        use_snap_edit=True,
+        use_snap_nonedit=True,
+        use_snap_selectable=False
+    )
+
+    bpy.context.view_layer.update()
 
 def resize_object(obj, scale_x, scale_y, scale_z):
     if obj:
@@ -563,11 +601,40 @@ def transformasiRidho4():
         
     #parent_objects(plate, rotor)
     
+def transformasiHarish():
+    rotateList = [angle1, cube1, shaft001, cube2, angle2, gripper, gripper1]
+    for obj in rotateList:
+        rotate_object_on_x_axis(obj.name, -0.268581)
+
+def transformasiHarish2():
+    rotateList = [angle1, cube1, shaft001, cube2, angle2, gripper, gripper1]
+    for obj in rotateList:
+        rotate_object_on_x_axis(obj.name, 0.268581)
+
+def transformasiHarish3():
+    rotateList = [angle1, cube1, shaft001, cube2, angle2, gripper, gripper1]
+    for obj in rotateList:
+        rotate_object_on_x_axis(obj.name, -0.268581)
+
 def insertKeyFrameForObjectTrans(objList, transformation, frameTime):
     for i in objList:
         i.keyframe_insert(transformation, frame=frameTime)
     
-    
+def transformasiDhea():
+    rotateList = [angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
+    for obj in rotateList:
+        rotate_object_on_x_axis(obj.name, -0.268581)
+
+def transformasiDhea2():
+    rotateList = [angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
+    for obj in rotateList:
+        rotate_object_on_x_axis(obj.name, 0.268581)
+        
+def transformasiDhea3():
+    rotateList = [angle, shaft, angle1, cube1, shaft001, cube2, angle2, gripper, gripper1, thruster, thruster1, thruster2, thruster3]
+    for obj in rotateList:
+        rotate_object_on_x_axis(obj.name, -0.268581)
+
 def gen_centerpiece(context):
     RobotArmObj = importArmRobot()
     
@@ -575,21 +642,28 @@ def gen_centerpiece(context):
     insertKeyFrameForObjectTrans(RobotArmObj, "location", 1)
     
     transformasiRidho()
+    transformasiDhea()
+    transformasiHarish()
     
     insertKeyFrameForObjectTrans(RobotArmObj, "rotation_euler", 100)
     insertKeyFrameForObjectTrans(RobotArmObj, "location", 100)
     
     transformasiRidho2()
+    transformasiHarish2()
+    transformasiDhea2()
     
     insertKeyFrameForObjectTrans(RobotArmObj, "rotation_euler", 200)
     insertKeyFrameForObjectTrans(RobotArmObj, "location", 200)
     
     transformasiRidho3()
+    transformasiHarish3()
+    transformasiDhea3()
     insertKeyFrameForObjectTrans(RobotArmObj, "rotation_euler", 300)
     insertKeyFrameForObjectTrans(RobotArmObj, "location", 300)
     
     transformasiRidho4()
-    
+    transformasiDhea()
+    transformasiHarish()
     insertKeyFrameForObjectTrans(RobotArmObj, "rotation_euler", 400)
     insertKeyFrameForObjectTrans(RobotArmObj, "location", 400)
     
